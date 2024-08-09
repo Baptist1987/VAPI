@@ -2,15 +2,26 @@ from flask import Flask, request, jsonify
 from googleapiclient.discovery import build
 from google.oauth2.credentials import Credentials
 import datetime
+import os
+from dotenv import load_dotenv
+
+# Laden der Umgebungsvariablen aus der .env-Datei
+load_dotenv()
+
+# Abrufen der Konfigurationen aus der .env Datei
+FLASK_RUN_PORT = int(os.getenv('FLASK_RUN_PORT', 5000))
+WEBHOOK_PATH = os.getenv('WEBHOOK_PATH', '/webhook')
+GOOGLE_CREDENTIALS_PATH = os.getenv('GOOGLE_CREDENTIALS_PATH', 'credentials.json')
+CALENDAR_ID = os.getenv('CALENDAR_ID', 'primary')
 
 app = Flask(__name__)
 
 # Laden Sie die Anmeldeinformationen für die Google Calendar API
-creds = Credentials.from_authorized_user_file('credentials.json', ['https://www.googleapis.com/auth/calendar'])
+creds = Credentials.from_authorized_user_file(GOOGLE_CREDENTIALS_PATH, ['https://www.googleapis.com/auth/calendar'])
 service = build('calendar', 'v3', credentials=creds)
 
 
-@app.route('/webhook', methods=['POST'])
+@app.route(WEBHOOK_PATH, methods=['POST'])
 def webhook():
     data = request.json
 
@@ -27,7 +38,7 @@ def webhook():
 
     # Prüfen, ob der Termin verfügbar ist
     events_result = service.events().list(
-        calendarId='primary',
+        calendarId=CALENDAR_ID,
         timeMin=start_time,
         timeMax=end_time,
         maxResults=1,
@@ -54,7 +65,7 @@ def find_alternative_times(service, start_time, end_time):
         new_end_time = end_time + datetime.timedelta(hours=i)
 
         events_result = service.events().list(
-            calendarId='primary',
+            calendarId=CALENDAR_ID,
             timeMin=new_start_time.isoformat() + 'Z',
             timeMax=new_end_time.isoformat() + 'Z',
             maxResults=1,
@@ -73,4 +84,4 @@ def find_alternative_times(service, start_time, end_time):
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    app.run(host='0.0.0.0', port=FLASK_RUN_PORT)
